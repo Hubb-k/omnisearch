@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+env:
+  CARGO_TERM_COLOR: always
+  OPENSSL_DIR: "C:/Program Files/OpenSSL-Win64"
+  OPENSSL_LIB_DIR: "C:/Program Files/OpenSSL-Win64/lib/VC/x64/MD"
+  OPENSSL_INCLUDE_DIR: "C:/Program Files/OpenSSL-Win64/include"
+
+jobs:
+  check:
+    name: Check, Fmt, Clippy
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install OpenSSL
+        run: choco install openssl --no-progress -y
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Clippy
+        run: cargo clippy -p core_lib -p importer -- -D warnings
+
+      - name: Build core
+        run: cargo build -p core_lib
+
+      - name: Build importer
+        run: cargo build -p importer

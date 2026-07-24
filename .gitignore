@@ -1,0 +1,24 @@
+/target
+/sessions_summary
+
+# Данные и индекс
+/data/
+
+# Модели (большие бинарники)
+/models/
+
+# Нативные библиотеки
+/libs/
+
+# Временные папки
+/models_new/
+
+# OpenSSL DLL в debug
+apps/desktop/src-tauri/target/
+
+# Секреты и env
+.env
+
+# OS
+.DS_Store
+Thumbs.db

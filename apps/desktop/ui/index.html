@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>OmniSearch</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #1a1a2e;
+      color: #eee;
+      font-family: 'Segoe UI', sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: 20px;
+      gap: 10px;
+    }
+    #search-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    #search-input {
+      flex: 1;
+      padding: 14px 18px;
+      font-size: 18px;
+      background: #16213e;
+      border: 2px solid #2e86ab;
+      border-radius: 10px;
+      color: #fff;
+      outline: none;
+    }
+    #search-input:focus { border-color: #5bc0eb; }
+    #clear-btn {
+      padding: 10px 14px;
+      background: #16213e;
+      border: 2px solid #2e86ab;
+      border-radius: 10px;
+      color: #888;
+      cursor: pointer;
+      font-size: 16px;
+      line-height: 1;
+      display: none;
+    }
+    #clear-btn:hover { border-color: #5bc0eb; color: #eee; }
+    #status { font-size: 11px; color: #888; }
+    #results {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      overflow-y: auto;
+    }
+    .result {
+      background: #16213e;
+      border-left: 3px solid #2e86ab;
+      padding: 10px 14px;
+      border-radius: 6px;
+    }
+    .result:hover { border-left-color: #5bc0eb; }
+    .result.chosen { border-left-color: #5bc0eb; }
+    .result .text { font-size: 13px; color: #ddd; }
+    .result .meta { font-size: 10px; color: #666; margin-top: 3px; }
+    .result:first-child .text { font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div id="search-row">
+    <input id="search-input" placeholder="Введи запрос и нажми Enter..." autofocus />
+    <button id="clear-btn" title="Сбросить">✕</button>
+  </div>
+  <div id="status">Введи запрос и нажми Enter</div>
+  <div id="results"></div>
+
+  <script>
+    const { invoke } = window.__TAURI__.core;
+    const input = document.getElementById('search-input');
+    const results = document.getElementById('results');
+    const status = document.getElementById('status');
+    const clearBtn = document.getElementById('clear-btn');
+
+    let lastQuery = '';
+    let lastHits = [];
+
+    function reset() {
+      input.value = '';
+      results.innerHTML = '';
+      status.textContent = 'Введи запрос и нажми Enter';
+      clearBtn.style.display = 'none';
+      lastQuery = '';
+      lastHits = [];
+      input.focus();
+    }
+
+    clearBtn.addEventListener('click', reset);
+
+    function renderResult(h, isTop) {
+      const div = document.createElement('div');
+      div.className = 'result' + (isTop ? ' chosen' : '');
+
+      function escapeHtml(s) {
+        return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      }
+      const rawText = isTop ? h.text : h.text.slice(0, 120) + (h.text.length > 120 ? '...' : '');
+      const text = escapeHtml(rawText);
+      const similarity = (1 - h.distance).toFixed(3);
+      const matchType = h.match_type ?? 'vector';
+      const timestamp = h.timestamp.slice(0, 19);
+      const source = h.source.length > 60 ? h.source.slice(0, 60) + '...' : h.source;
+
+      div.innerHTML = `
+        <div class="text">${text}</div>
+        <div class="meta">${similarity} · ${matchType} · ${source} · ${timestamp}</div>
+      `;
+
+      div.addEventListener('click', () => {
+        const rejectedIds = lastHits.filter(x => x.id !== h.id).map(x => x.id);
+        invoke('feedback', { query: lastQuery, chosenId: h.id, rejectedIds });
+      });
+
+      return div;
+    }
+
+    input.addEventListener('keydown', async (e) => {
+      if (e.key === 'Escape') {
+        if (results.children.length > 0) { reset(); return; }
+        window.__TAURI__.window.getCurrentWindow().hide();
+        return;
+      }
+      if (e.key !== 'Enter') return;
+
+      const query = input.value.trim();
+      if (!query) return;
+
+      status.textContent = 'Ищу...';
+      results.innerHTML = '';
+      clearBtn.style.display = 'none';
+
+      try {
+        const hits = await invoke('search', { query });
+        if (!hits.length || (1 - hits[0].distance) < 0.3) {
+          status.textContent = 'Ничего не найдено';
+          return;
+        }
+
+        lastQuery = query;
+        lastHits = hits;
+        clearBtn.style.display = 'block';
+
+        const top = hits[0];
+        const rest = hits.slice(1, 4);
+        status.textContent = `${(1 - top.distance).toFixed(3)} · ${top.match_type ?? 'vector'}`;
+
+        results.appendChild(renderResult(top, true));
+        rest.forEach(h => results.appendChild(renderResult(h, false)));
+
+      } catch(e) {
+        status.textContent = 'Ошибка: ' + JSON.stringify(e);
+      }
+    });
+  </script>
+</body>
+</html>

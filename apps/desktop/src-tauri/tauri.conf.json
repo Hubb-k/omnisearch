@@ -1,0 +1,36 @@
+{
+  "productName": "OmniSearch",
+  "version": "0.1.0",
+  "identifier": "com.netintelligence.omnisearch",
+  "build": {
+    "frontendDist": "../ui"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "OmniSearch",
+        "width": 700,
+        "height": 500,
+        "resizable": true,
+        "decorations": true,
+        "alwaysOnTop": true,
+        "center": true,
+        "visible": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": []
+  },
+  "plugins": {
+    "shell": {
+      "open": true
+    }
+  }
+}
