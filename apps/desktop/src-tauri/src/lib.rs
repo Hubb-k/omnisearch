@@ -1,7 +1,7 @@
+use core_lib::index::hnsw::HnswIndex;
+use core_lib::vectorize::minilm::MiniLM;
 use std::sync::{Arc, Mutex};
 use tauri::Manager;
-use core_lib::vectorize::minilm::MiniLM;
-use core_lib::index::hnsw::HnswIndex;
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut};
 
 struct AppState {
@@ -16,17 +16,25 @@ fn search(query: String, state: tauri::State<Arc<Mutex<AppState>>>) -> Vec<serde
 
     let vec = match state.model.embed(&query) {
         Ok(v) => v,
-        Err(e) => { eprintln!("[Ошибка] {}", e); return vec![]; }
+        Err(e) => {
+            eprintln!("[Ошибка] {}", e);
+            return vec![];
+        }
     };
     let vec = core_lib::crypto::permute(&vec);
 
     let vector_hits = state.index.search(&vec, 10).unwrap_or_default();
 
-    let fts_query = query.split_whitespace()
-    .map(|w| w.chars().filter(|c| c.is_alphanumeric()).collect::<String>())
-    .filter(|w| !w.is_empty())
-    .collect::<Vec<_>>()
-    .join(" ");
+    let fts_query = query
+        .split_whitespace()
+        .map(|w| {
+            w.chars()
+                .filter(|c| c.is_alphanumeric())
+                .collect::<String>()
+        })
+        .filter(|w| !w.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ");
     let fts_hits = state.index.fts_search(&fts_query, 10).unwrap_or_default();
 
     let mut seen = std::collections::HashSet::new();
@@ -57,13 +65,15 @@ fn search(query: String, state: tauri::State<Arc<Mutex<AppState>>>) -> Vec<serde
         }
     }
 
-    let high_quality: Vec<_> = vector_hits.iter()
+    let high_quality: Vec<_> = vector_hits
+        .iter()
         .filter(|r| (1.0 - r.distance) >= 0.78)
         .collect();
 
     if !high_quality.is_empty() {
         let chosen_ids: Vec<u64> = high_quality.iter().map(|r| r.id).collect();
-        let rejected_ids: Vec<u64> = vector_hits.iter()
+        let rejected_ids: Vec<u64> = vector_hits
+            .iter()
             .filter(|r| (1.0 - r.distance) < 0.78)
             .map(|r| r.id)
             .collect();
@@ -74,7 +84,12 @@ fn search(query: String, state: tauri::State<Arc<Mutex<AppState>>>) -> Vec<serde
             }
         }
         let count = state.index.feedback_count();
-        eprintln!("[AutoFeedback] chosen={} rejected={} пар={}", chosen_ids.len(), rejected_ids.len(), count);
+        eprintln!(
+            "[AutoFeedback] chosen={} rejected={} пар={}",
+            chosen_ids.len(),
+            rejected_ids.len(),
+            count
+        );
         if core_lib::training::should_train(count) {
             let data_dir = state.data_dir.clone();
             let model_dir = format!("{}/../../../models", env!("CARGO_MANIFEST_DIR"));
@@ -82,7 +97,12 @@ fn search(query: String, state: tauri::State<Arc<Mutex<AppState>>>) -> Vec<serde
         }
     }
 
-    eprintln!("[Search] vector={} fts={} total={}", vector_hits.len(), fts_hits.len(), combined.len());
+    eprintln!(
+        "[Search] vector={} fts={} total={}",
+        vector_hits.len(),
+        fts_hits.len(),
+        combined.len()
+    );
     combined
 }
 
@@ -133,31 +153,39 @@ pub fn run() {
 
             let shortcut = Shortcut::new(Some(Modifiers::ALT), Code::Space);
             let app_handle = app.handle().clone();
-            app.global_shortcut().on_shortcut(shortcut, move |_app, _shortcut, event| {
-                if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
-                    if let Some(window) = app_handle.get_webview_window("main") {
-                        if window.is_visible().unwrap_or(false) {
-                            let _ = window.hide();
-                        } else {
-                            let _ = window.show();
-                            let _ = window.set_focus();
+            app.global_shortcut()
+                .on_shortcut(shortcut, move |_app, _shortcut, event| {
+                    if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
+                        if let Some(window) = app_handle.get_webview_window("main") {
+                            if window.is_visible().unwrap_or(false) {
+                                let _ = window.hide();
+                            } else {
+                                let _ = window.show();
+                                let _ = window.set_focus();
+                            }
                         }
                     }
-                }
-            })?;
+                })?;
 
             let state_ws = state.clone();
             core_lib::capture::websocket::start_ws_server(move |text: String, source: String| {
-                if text.trim().len() < 10 { return; }
+                if text.trim().len() < 10 {
+                    return;
+                }
                 let mut s = state_ws.lock().unwrap();
                 let vec = match s.model.embed(&text) {
                     Ok(v) => v,
-                    Err(e) => { eprintln!("[WS Ошибка] {}", e); return; }
+                    Err(e) => {
+                        eprintln!("[WS Ошибка] {}", e);
+                        return;
+                    }
                 };
                 let vec = core_lib::crypto::permute(&vec);
                 if let Ok(results) = s.index.search(&vec, 1) {
                     if let Some(r) = results.first() {
-                        if r.distance < 0.05 { return; }
+                        if r.distance < 0.05 {
+                            return;
+                        }
                     }
                 }
                 match s.index.add(&text, &source, &vec) {
@@ -169,16 +197,23 @@ pub fn run() {
             let state_cb = state.clone();
             std::thread::spawn(move || {
                 if let Err(e) = core_lib::capture::clipboard::start_listener(move |text: String| {
-                    if text.trim().len() < 10 { return; }
+                    if text.trim().len() < 10 {
+                        return;
+                    }
                     let mut s = state_cb.lock().unwrap();
                     let vec = match s.model.embed(&text) {
                         Ok(v) => v,
-                        Err(e) => { eprintln!("[Ошибка векторизации] {}", e); return; }
+                        Err(e) => {
+                            eprintln!("[Ошибка векторизации] {}", e);
+                            return;
+                        }
                     };
                     let vec = core_lib::crypto::permute(&vec);
                     if let Ok(results) = s.index.search(&vec, 1) {
                         if let Some(r) = results.first() {
-                            if r.distance < 0.05 { return; }
+                            if r.distance < 0.05 {
+                                return;
+                            }
                         }
                     }
                     let data_dir = s.data_dir.clone();

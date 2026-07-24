@@ -1,6 +1,6 @@
 use std::ptr::null_mut;
-use std::sync::OnceLock;
 use std::sync::Arc;
+use std::sync::OnceLock;
 use windows::core::PCWSTR;
 use windows::Win32::Foundation::{HANDLE, HGLOBAL, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::System::DataExchange::{
@@ -9,15 +9,20 @@ use windows::Win32::System::DataExchange::{
 use windows::Win32::System::Memory::{GlobalLock, GlobalSize, GlobalUnlock};
 use windows::Win32::System::Threading::{GetCurrentProcess, SetPriorityClass, IDLE_PRIORITY_CLASS};
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW, RegisterClassW,
-    WINDOW_EX_STYLE, WINDOW_STYLE, WNDCLASSW, WM_CLIPBOARDUPDATE, MSG,
+    CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW, RegisterClassW, MSG,
+    WINDOW_EX_STYLE, WINDOW_STYLE, WM_CLIPBOARDUPDATE, WNDCLASSW,
 };
 
 const CF_UNICODETEXT: u32 = 13;
 
 static CALLBACK: OnceLock<Arc<dyn Fn(String) + Send + Sync>> = OnceLock::new();
 
-unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+unsafe extern "system" fn wnd_proc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
     if msg == WM_CLIPBOARDUPDATE {
         if OpenClipboard(hwnd).is_ok() {
             if let Ok(handle) = GetClipboardData(CF_UNICODETEXT) {
@@ -76,9 +81,14 @@ where
             PCWSTR(class_name.as_ptr()),
             PCWSTR(null_mut()),
             WINDOW_STYLE(0),
-            0, 0, 0, 0,
+            0,
+            0,
+            0,
+            0,
             HWND(0),
-            None, None, None,
+            None,
+            None,
+            None,
         );
 
         AddClipboardFormatListener(hwnd)?;

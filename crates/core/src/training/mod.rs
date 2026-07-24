@@ -13,7 +13,9 @@ pub fn spawn_finetune(data_dir: &str, model_dir: &str) {
     std::thread::spawn(move || {
         std::thread::sleep(std::time::Duration::from_secs(30));
 
-        let script = Path::new(&model_dir).parent().unwrap()
+        let script = Path::new(&model_dir)
+            .parent()
+            .unwrap()
             .join("scripts/finetune.py");
 
         if !script.exists() {
@@ -25,8 +27,10 @@ pub fn spawn_finetune(data_dir: &str, model_dir: &str) {
 
         let mut cmd = std::process::Command::new("python");
         cmd.arg(&script)
-            .arg("--data_dir").arg(&data_dir)
-            .arg("--model_dir").arg(&model_dir)
+            .arg("--data_dir")
+            .arg(&data_dir)
+            .arg("--model_dir")
+            .arg(&model_dir)
             .env("OMP_NUM_THREADS", "1")
             .env("RAYON_NUM_THREADS", "1");
 

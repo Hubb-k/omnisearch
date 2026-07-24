@@ -1,7 +1,7 @@
+use ndarray::Array2;
 use ort::session::Session;
 use ort::value::Tensor;
 use tokenizers::Tokenizer;
-use ndarray::Array2;
 
 pub struct MiniLM {
     session: ort::session::InMemorySession<'static>,
@@ -12,8 +12,8 @@ impl MiniLM {
     pub fn load() -> Result<Self, Box<dyn std::error::Error>> {
         ort::init().with_name("minilm").commit();
 
-        let model_path = std::env::var("ORT_MODEL_PATH")
-            .unwrap_or_else(|_| "models/model.onnx".to_string());
+        let model_path =
+            std::env::var("ORT_MODEL_PATH").unwrap_or_else(|_| "models/model.onnx".to_string());
         let tokenizer_path = std::env::var("ORT_TOKENIZER_PATH")
             .unwrap_or_else(|_| "models/tokenizer.json".to_string());
 
@@ -22,28 +22,33 @@ impl MiniLM {
             .with_intra_threads(1)?
             .commit_from_memory_directly(model_bytes)?;
 
-        let tokenizer = Tokenizer::from_file(&tokenizer_path)
-            .map_err(|e| format!("Tokenizer error: {}", e))?;
+        let tokenizer =
+            Tokenizer::from_file(&tokenizer_path).map_err(|e| format!("Tokenizer error: {}", e))?;
 
         Ok(Self { session, tokenizer })
     }
 
     pub fn embed(&mut self, text: &str) -> Result<Vec<f32>, Box<dyn std::error::Error>> {
-        let encoding = self.tokenizer
+        let encoding = self
+            .tokenizer
             .encode(text, true)
             .map_err(|e| format!("Encode error: {}", e))?;
 
         let len = encoding.get_ids().len();
 
-        let ids: Vec<i64>      = encoding.get_ids().iter().map(|&x| x as i64).collect();
-        let mask: Vec<i64>     = encoding.get_attention_mask().iter().map(|&x| x as i64).collect();
+        let ids: Vec<i64> = encoding.get_ids().iter().map(|&x| x as i64).collect();
+        let mask: Vec<i64> = encoding
+            .get_attention_mask()
+            .iter()
+            .map(|&x| x as i64)
+            .collect();
         let type_ids: Vec<i64> = encoding.get_type_ids().iter().map(|&x| x as i64).collect();
 
         // Сохраняем маску до передачи в тензор
         let mask_f32: Vec<f32> = mask.iter().map(|&x| x as f32).collect();
 
-        let ids_tensor      = Tensor::from_array(([1, len], ids))?;
-        let mask_tensor     = Tensor::from_array(([1, len], mask))?;
+        let ids_tensor = Tensor::from_array(([1, len], ids))?;
+        let mask_tensor = Tensor::from_array(([1, len], mask))?;
         let type_ids_tensor = Tensor::from_array(([1, len], type_ids))?;
 
         let outputs = self.session.run(ort::inputs![
@@ -54,7 +59,7 @@ impl MiniLM {
 
         let (shape, data) = outputs["last_hidden_state"].try_extract_tensor::<f32>()?;
         let seq_len = shape[1] as usize;
-        let hidden  = shape[2] as usize;
+        let hidden = shape[2] as usize;
 
         let array = Array2::from_shape_vec((seq_len, hidden), data.to_vec())?;
 

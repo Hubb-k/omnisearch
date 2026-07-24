@@ -1,9 +1,9 @@
+use serde::Deserialize;
+use std::collections::HashSet;
 use std::net::TcpListener;
 use std::sync::{Arc, Mutex};
-use std::collections::HashSet;
 use tungstenite::accept;
 use tungstenite::Message;
-use serde::Deserialize;
 
 #[derive(Deserialize)]
 struct IncomingMessage {

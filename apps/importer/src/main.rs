@@ -1,6 +1,6 @@
-use core_lib::vectorize::minilm::MiniLM;
-use core_lib::index::hnsw::HnswIndex;
 use core_lib::crypto;
+use core_lib::index::hnsw::HnswIndex;
+use core_lib::vectorize::minilm::MiniLM;
 use std::fs;
 
 const DATA_DIR: &str = "data";
@@ -26,8 +26,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let entry = entry?;
         let path = entry.path();
         let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
-        if !matches!(ext, "txt" | "md" | "rs" | "toml" | "json" | "js" | "ts" | "py") { continue; }
-
+        if !matches!(
+            ext,
+            "txt" | "md" | "rs" | "toml" | "json" | "js" | "ts" | "py"
+        ) {
+            continue;
+        }
 
         let filename = path.file_name().unwrap().to_string_lossy().to_string();
         println!("[Файл] {}", filename);

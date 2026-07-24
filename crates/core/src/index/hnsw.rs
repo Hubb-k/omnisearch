@@ -1,7 +1,7 @@
-use usearch::{Index, IndexOptions, MetricKind, ScalarKind};
-use rusqlite::{Connection, params};
-use chrono::Utc;
 use crate::crypto;
+use chrono::Utc;
+use rusqlite::{params, Connection};
+use usearch::{Index, IndexOptions, MetricKind, ScalarKind};
 
 pub struct HnswIndex {
     index: Index,
@@ -40,7 +40,8 @@ impl HnswIndex {
         let key = format!("{:016x}", crypto::get_seed());
         db.pragma_update(None, "key", &key)?;
 
-        db.execute_batch("
+        db.execute_batch(
+            "
             CREATE TABLE IF NOT EXISTS entries (
                 id        INTEGER PRIMARY KEY,
                 text      TEXT NOT NULL,
@@ -62,18 +63,23 @@ impl HnswIndex {
                 rejected_ids TEXT NOT NULL,
                 timestamp    TEXT NOT NULL
             );
-        ")?;
-
-        let next_id: u64 = db.query_row(
-            "SELECT COALESCE(MAX(id) + 1, 0) FROM entries",
-            [],
-            |row| row.get(0),
+        ",
         )?;
+
+        let next_id: u64 =
+            db.query_row("SELECT COALESCE(MAX(id) + 1, 0) FROM entries", [], |row| {
+                row.get(0)
+            })?;
 
         Ok(Self { index, db, next_id })
     }
 
-    pub fn add(&mut self, text: &str, source: &str, vector: &[f32]) -> Result<u64, Box<dyn std::error::Error>> {
+    pub fn add(
+        &mut self,
+        text: &str,
+        source: &str,
+        vector: &[f32],
+    ) -> Result<u64, Box<dyn std::error::Error>> {
         let id = self.next_id;
         self.next_id += 1;
         self.index.add(id, vector)?;
@@ -84,53 +90,80 @@ impl HnswIndex {
         Ok(id)
     }
 
-    pub fn search(&self, vector: &[f32], top_k: usize) -> Result<Vec<SearchResult>, Box<dyn std::error::Error>> {
+    pub fn search(
+        &self,
+        vector: &[f32],
+        top_k: usize,
+    ) -> Result<Vec<SearchResult>, Box<dyn std::error::Error>> {
         let results = self.index.search(vector, top_k)?;
         let mut out = Vec::new();
         for (&id, &dist) in results.keys.iter().zip(results.distances.iter()) {
             let (text, source, timestamp) = self.db.query_row(
                 "SELECT text, source, timestamp FROM entries WHERE id = ?1",
                 params![id],
-                |row| Ok((
-                    row.get::<_, String>(0)?,
-                    row.get::<_, String>(1)?,
-                    row.get::<_, String>(2)?,
-                )),
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, String>(2)?,
+                    ))
+                },
             )?;
-            out.push(SearchResult { id, distance: dist, text, source, timestamp });
+            out.push(SearchResult {
+                id,
+                distance: dist,
+                text,
+                source,
+                timestamp,
+            });
         }
         Ok(out)
     }
 
-    pub fn fts_search(&self, query: &str, top_k: usize) -> Result<Vec<SearchResult>, Box<dyn std::error::Error>> {
+    pub fn fts_search(
+        &self,
+        query: &str,
+        top_k: usize,
+    ) -> Result<Vec<SearchResult>, Box<dyn std::error::Error>> {
         let mut stmt = self.db.prepare(
             "SELECT e.id, e.text, e.source, e.timestamp, f.rank
              FROM entries_fts f
              JOIN entries e ON e.id = f.rowid
              WHERE entries_fts MATCH ?1
              ORDER BY rank
-             LIMIT ?2"
+             LIMIT ?2",
         )?;
-        let results = stmt.query_map(
-            params![query, top_k as i64],
-            |row| Ok((
-                row.get::<_, u64>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, String>(2)?,
-                row.get::<_, String>(3)?,
-                row.get::<_, f64>(4)?,
-            )),
-        )?
-        .filter_map(|r| r.ok())
-        .map(|(id, text, source, timestamp, rank)| {
-            let distance = (rank.abs() / 20.0).min(1.0) as f32;
-            SearchResult { id, text, source, timestamp, distance }
-        })
-        .collect();
+        let results = stmt
+            .query_map(params![query, top_k as i64], |row| {
+                Ok((
+                    row.get::<_, u64>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, f64>(4)?,
+                ))
+            })?
+            .filter_map(|r| r.ok())
+            .map(|(id, text, source, timestamp, rank)| {
+                let distance = (rank.abs() / 20.0).min(1.0) as f32;
+                SearchResult {
+                    id,
+                    text,
+                    source,
+                    timestamp,
+                    distance,
+                }
+            })
+            .collect();
         Ok(results)
     }
 
-    pub fn add_feedback(&self, query: &str, chosen_id: u64, rejected_ids: &[u64]) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn add_feedback(
+        &self,
+        query: &str,
+        chosen_id: u64,
+        rejected_ids: &[u64],
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let rejected = serde_json::to_string(rejected_ids)?;
         self.db.execute(
             "INSERT INTO feedback (query, chosen_id, rejected_ids, timestamp) VALUES (?1, ?2, ?3, ?4)",
@@ -140,7 +173,9 @@ impl HnswIndex {
     }
 
     pub fn feedback_count(&self) -> usize {
-        self.db.query_row("SELECT COUNT(*) FROM feedback", [], |r| r.get(0)).unwrap_or(0)
+        self.db
+            .query_row("SELECT COUNT(*) FROM feedback", [], |r| r.get(0))
+            .unwrap_or(0)
     }
 
     pub fn save(&self, data_dir: &str) -> Result<(), Box<dyn std::error::Error>> {
