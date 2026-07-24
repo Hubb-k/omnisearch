@@ -63,20 +63,18 @@ impl MiniLM {
 
         let array = Array2::from_shape_vec((seq_len, hidden), data.to_vec())?;
 
-        // Mean pooling с учётом attention mask
         let mask_sum: f32 = mask_f32.iter().sum::<f32>().max(1e-9);
         let mut pooled = vec![0.0f32; hidden];
         for token_idx in 0..seq_len {
             let token_mask = mask_f32[token_idx];
-            for dim in 0..hidden {
-                pooled[dim] += array[[token_idx, dim]] * token_mask;
+            for (dim, p) in pooled.iter_mut().enumerate() {
+                *p += array[[token_idx, dim]] * token_mask;
             }
         }
-        for dim in 0..hidden {
-            pooled[dim] /= mask_sum;
+        for p in pooled.iter_mut() {
+            *p /= mask_sum;
         }
 
-        // L2 нормализация
         let norm: f32 = pooled.iter().map(|x| x * x).sum::<f32>().sqrt();
         let normalized: Vec<f32> = pooled.iter().map(|x| x / norm).collect();
 

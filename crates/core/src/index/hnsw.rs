@@ -187,6 +187,10 @@ impl HnswIndex {
     pub fn len(&self) -> usize {
         self.index.size()
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.index.size() == 0
+    }
 }
 
 pub struct SearchResult {

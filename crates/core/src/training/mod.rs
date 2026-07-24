@@ -3,7 +3,7 @@ use std::os::windows::process::CommandExt;
 use std::path::Path;
 
 pub fn should_train(feedback_count: usize) -> bool {
-    feedback_count > 0 && feedback_count % 50 == 0
+    feedback_count > 0 && feedback_count.is_multiple_of(50)
 }
 
 pub fn spawn_finetune(data_dir: &str, model_dir: &str) {
