@@ -36,6 +36,16 @@ jobs:
       - name: Install OpenSSL
         run: choco install openssl --no-progress -y
 
+      - name: Download ONNX Runtime
+        run: |
+          $url = "https://github.com/microsoft/onnxruntime/releases/download/v1.20.1/onnxruntime-win-x64-1.20.1.zip"
+          Invoke-WebRequest -Uri $url -OutFile ort.zip
+          Expand-Archive ort.zip -DestinationPath ort_tmp
+          New-Item -ItemType Directory -Force -Path libs/onnxruntime/lib
+          Copy-Item ort_tmp/onnxruntime-win-x64-1.20.1/lib/onnxruntime.lib libs/onnxruntime/lib/
+          Copy-Item ort_tmp/onnxruntime-win-x64-1.20.1/lib/onnxruntime.dll libs/onnxruntime/lib/
+        shell: pwsh
+
       - name: Check formatting
         run: cargo fmt --all -- --check
 
