@@ -4,5 +4,5 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-core_lib = { path = "../../crates/core" }
-encoding_rs = "0.8"
+core_lib    = { workspace = true }
+encoding_rs = { workspace = true }

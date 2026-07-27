@@ -9,10 +9,23 @@
     "withGlobalTauri": true,
     "windows": [
       {
+        "label": "main",
         "title": "OmniSearch",
         "width": 700,
         "height": 500,
         "resizable": true,
+        "decorations": true,
+        "alwaysOnTop": true,
+        "center": true,
+        "visible": false
+      },
+      {
+        "label": "password",
+        "title": "OmniSearch — Unlock",
+        "url": "password.html",
+        "width": 400,
+        "height": 180,
+        "resizable": false,
         "decorations": true,
         "alwaysOnTop": true,
         "center": true,

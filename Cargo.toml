@@ -7,5 +7,33 @@ members = [
 resolver = "2"
 
 [workspace.dependencies]
-tokio = { version = "1", features = ["full"] }
-serde = { version = "1", features = ["derive"] }
+# Shared
+tokio        = { version = "1", features = ["full"] }
+serde        = { version = "1", features = ["derive"] }
+serde_json   = "1"
+chrono       = { version = "0.4", features = ["serde"] }
+encoding_rs  = "0.8"
+
+# Core
+ort          = { version = "2.0.0-rc.12", default-features = false }
+tokenizers   = { version = "0.19", default-features = false, features = ["onig"] }
+ndarray      = "0.15"
+usearch      = "2"
+rusqlite     = { version = "0.32", features = ["bundled-sqlcipher"] }
+tungstenite  = "0.24"
+candle-core  = { version = "0.8", default-features = false }
+candle-nn    = { version = "0.8", default-features = false }
+
+# Crypto
+argon2  = "0.5"
+rand    = "0.8"
+chacha20poly1305 = "0.10"
+base64 = "0.22"
+
+# Desktop
+tauri                      = { version = "2", features = [] }
+tauri-plugin-global-shortcut = "2.3.2"
+tauri-build                = { version = "2", features = [] }
+
+# Path deps
+core_lib = { path = "crates/core" }

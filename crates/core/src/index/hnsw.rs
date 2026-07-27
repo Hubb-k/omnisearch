@@ -23,13 +23,16 @@ impl HnswIndex {
             ..Default::default()
         };
 
-        let index_path = format!("{}/vectors.usearch", data_dir);
         let db_path = format!("{}/meta.sqlite", data_dir);
+        let enc_path = format!("{}/vectors.usearch.enc", data_dir);
 
         let index = Index::new(&options)?;
 
-        if std::path::Path::new(&index_path).exists() {
-            index.load(&index_path)?;
+        if std::path::Path::new(&enc_path).exists() {
+            let encrypted = std::fs::read(&enc_path)?;
+            let plain = crypto::decrypt_blob(&encrypted)
+                .map_err(|e| format!("Не удалось расшифровать индекс: {}", e))?;
+            index.load_from_buffer(&plain)?;
             index.reserve(index.size() + 100_000)?;
         } else {
             index.reserve(100_000)?;
@@ -37,7 +40,7 @@ impl HnswIndex {
 
         let db = Connection::open(&db_path)?;
 
-        let key = format!("{:016x}", crypto::get_seed());
+        let key = crypto::get_db_key();
         db.pragma_update(None, "key", &key)?;
 
         db.execute_batch(
@@ -179,8 +182,12 @@ impl HnswIndex {
     }
 
     pub fn save(&self, data_dir: &str) -> Result<(), Box<dyn std::error::Error>> {
-        let index_path = format!("{}/vectors.usearch", data_dir);
-        self.index.save(&index_path)?;
+        let len = self.index.serialized_length();
+        let mut buf = vec![0u8; len];
+        self.index.save_to_buffer(&mut buf)?;
+        let encrypted = crypto::encrypt_blob(&buf);
+        let enc_path = format!("{}/vectors.usearch.enc", data_dir);
+        std::fs::write(&enc_path, &encrypted)?;
         Ok(())
     }
 
@@ -190,6 +197,49 @@ impl HnswIndex {
 
     pub fn is_empty(&self) -> bool {
         self.index.size() == 0
+    }
+
+    pub fn get_triplets(
+        &self,
+        limit: usize,
+    ) -> Result<Vec<[Vec<f32>; 3]>, Box<dyn std::error::Error>> {
+        let mut stmt = self.db.prepare(
+            "SELECT chosen_id, rejected_ids FROM feedback ORDER BY id DESC LIMIT ?1",
+        )?;
+
+        let rows: Vec<(u64, String)> = stmt
+            .query_map(params![limit as i64], |row| {
+                Ok((row.get::<_, u64>(0)?, row.get::<_, String>(1)?))
+            })?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        let mut triplets = Vec::new();
+
+        for (chosen_id, rejected_json) in rows {
+            let rejected_ids: Vec<u64> = match serde_json::from_str(&rejected_json) {
+                Ok(v) => v,
+                Err(_) => continue,
+            };
+            let first_rejected = match rejected_ids.first().copied() {
+                Some(id) => id,
+                None => continue,
+            };
+
+            let mut pos_buf = vec![0f32; 384];
+            let mut neg_buf = vec![0f32; 384];
+
+            if self.index.get(chosen_id, &mut pos_buf).is_err() {
+                continue;
+            }
+            if self.index.get(first_rejected, &mut neg_buf).is_err() {
+                continue;
+            }
+
+            triplets.push([pos_buf.clone(), pos_buf, neg_buf]);
+        }
+
+        Ok(triplets)
     }
 }
 

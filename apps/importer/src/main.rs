@@ -2,23 +2,30 @@ use core_lib::crypto;
 use core_lib::index::hnsw::HnswIndex;
 use core_lib::vectorize::minilm::MiniLM;
 use std::fs;
+use std::io::{self, Write};
 
-const DATA_DIR: &str = "data";
 const CHUNK_SIZE: usize = 500;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
-    if args.len() < 2 {
-        eprintln!("Использование: importer <папка>");
+    if args.len() < 3 {
+        eprintln!("Использование: importer <папка> <data_dir>");
         return Ok(());
     }
 
-    // Инициализируем обфускацию
-    crypto::init();
-
     let folder = &args[1];
+    let data_dir = &args[2];
+
+    print!("Пароль: ");
+    io::stdout().flush()?;
+    let mut password = String::new();
+    io::stdin().read_line(&mut password)?;
+    let password = password.trim();
+
+    crypto::init_with_password(data_dir, password)?;
+
     let mut model = MiniLM::load()?;
-    let mut index = HnswIndex::new(DATA_DIR)?;
+    let mut index = HnswIndex::new(data_dir)?;
 
     println!("[Импортер] Индекс загружен: {} записей", index.len());
 
@@ -59,13 +66,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             if chunk.len() > 50 {
                 match model.embed(&chunk) {
                     Ok(vec) => {
-                        // Обфускация перед записью в индекс
                         let vec = crypto::permute(&vec);
                         let _ = index.add(&chunk, &filename, &vec);
                         file_count += 1;
                         if file_count % 200 == 0 {
                             println!("  → {} чанков", file_count);
-                            let _ = index.save(DATA_DIR);
+                            let _ = index.save(data_dir);
                         }
                     }
                     Err(e) => eprintln!("[Ошибка] {}", e),
@@ -75,7 +81,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         println!("  → Готово: {} чанков", file_count);
-        index.save(DATA_DIR)?;
+        index.save(data_dir)?;
     }
 
     println!("[Готово] Всего в индексе: {} записей", index.len());

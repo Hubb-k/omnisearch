@@ -1,13 +1,13 @@
-const SKIP_TAGS = new Set(['SCRIPT', 'STYLE', 'NAV', 'FOOTER', 'HEADER', 'ASIDE']);
+const SKIP_TAGS = new Set([
+  'SCRIPT', 'STYLE', 'NAV', 'FOOTER', 'HEADER', 'ASIDE', 'NOSCRIPT',
+  'SVG', 'PATH', 'DEFS', 'SYMBOL', 'USE', 'G', 'CIRCLE',
+  'RECT', 'LINE', 'POLYGON', 'POLYLINE', 'ELLIPSE'
+]);
 const MAX_CHUNKS = 20;
 
-function shouldIndex(url, text) {
-  const u = new URL(url);
-  if (!url.startsWith('http')) return false;
-  if (u.pathname === '/' || u.pathname === '') return false;
-  if (u.searchParams.has('q') || u.searchParams.has('search') || u.searchParams.has('query')) return false;
-  if (text.length < 500) return false;
-  return true;
+function isJunk(chunk) {
+  const junkRatio = (chunk.match(/[{}<>:;=\/\\]/g) || []).length / chunk.length;
+  return junkRatio > 0.15;
 }
 
 function extractPageText() {
@@ -34,17 +34,18 @@ function sendToLocal(text, url, title) {
 
   for (let i = 0; i < chars.length; i += CHUNK - OVERLAP) {
     const chunk = chars.slice(i, i + CHUNK).join('').trim();
-    if (chunk.length > 50) chunks.push(chunk);
+    if (chunk.length > 50 && !isJunk(chunk)) chunks.push(chunk);
     if (chunks.length >= MAX_CHUNKS) break;
   }
 
+  if (chunks.length === 0) return;
   chrome.runtime.sendMessage({ type: 'INDEX_PAGE', chunks, url, title });
 }
 
 window.addEventListener('load', () => {
   setTimeout(() => {
     const text = extractPageText();
-    if (shouldIndex(location.href, text)) {
+    if (text.length >= 500) {
       sendToLocal(text, location.href, document.title);
     }
   }, 1500);
