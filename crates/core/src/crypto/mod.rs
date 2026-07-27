@@ -104,7 +104,7 @@ pub fn init_with_password(data_dir: &str, password: &str) -> Result<(), String> 
         OsRng.fill_bytes(&mut new_master_key);
         let derived = derive_key(password, &salt_bytes);
         let blob = encrypt_master_key(&new_master_key, &derived);
-        std::fs::write(&salt_path, &salt_bytes)
+        std::fs::write(&salt_path, salt_bytes)
             .map_err(|e| format!("Не удалось записать соль: {}", e))?;
         std::fs::write(&key_path, &blob)
             .map_err(|e| format!("Не удалось записать key.bin: {}", e))?;

@@ -4,7 +4,7 @@ use std::path::Path;
 
 pub fn should_train(feedback_count: usize) -> bool {
     let threshold = crate::adapter::current_threshold();
-    feedback_count > 0 && feedback_count % threshold == 0
+    feedback_count > 0 && feedback_count.is_multiple_of(threshold)
 }
 
 pub fn spawn_adapter_training(triplets: Vec<[Vec<f32>; 3]>, model_dir: String) {
