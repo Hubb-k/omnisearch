@@ -203,9 +203,9 @@ impl HnswIndex {
         &self,
         limit: usize,
     ) -> Result<Vec<[Vec<f32>; 3]>, Box<dyn std::error::Error>> {
-        let mut stmt = self.db.prepare(
-            "SELECT chosen_id, rejected_ids FROM feedback ORDER BY id DESC LIMIT ?1",
-        )?;
+        let mut stmt = self
+            .db
+            .prepare("SELECT chosen_id, rejected_ids FROM feedback ORDER BY id DESC LIMIT ?1")?;
 
         let rows: Vec<(u64, String)> = stmt
             .query_map(params![limit as i64], |row| {

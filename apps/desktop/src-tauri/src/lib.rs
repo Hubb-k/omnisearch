@@ -32,7 +32,11 @@ fn unlock(
 
     {
         let mut s = state.lock().unwrap();
-        s.inner = Some(AppStateInner { model, index, data_dir });
+        s.inner = Some(AppStateInner {
+            model,
+            index,
+            data_dir,
+        });
     }
 
     if let Some(pw_window) = app.get_webview_window("password") {
@@ -47,10 +51,7 @@ fn unlock(
 }
 
 #[tauri::command]
-fn search(
-    query: String,
-    state: tauri::State<Arc<Mutex<AppState>>>,
-) -> Vec<serde_json::Value> {
+fn search(query: String, state: tauri::State<Arc<Mutex<AppState>>>) -> Vec<serde_json::Value> {
     let mut state = state.lock().unwrap();
     let inner = match state.inner.as_mut() {
         Some(s) => s,
@@ -71,7 +72,11 @@ fn search(
 
     let fts_query = query
         .split_whitespace()
-        .map(|w| w.chars().filter(|c| c.is_alphanumeric()).collect::<String>())
+        .map(|w| {
+            w.chars()
+                .filter(|c| c.is_alphanumeric())
+                .collect::<String>()
+        })
         .filter(|w| !w.is_empty())
         .collect::<Vec<_>>()
         .join(" ");

@@ -142,7 +142,10 @@ pub fn train(triplets: Vec<[Vec<f32>; 3]>, model_dir: String) {
     std::thread::spawn(move || {
         let _guard = TrainingGuard;
 
-        eprintln!("[Adapter] Запуск обучения на {} триплетах...", triplets.len());
+        eprintln!(
+            "[Adapter] Запуск обучения на {} триплетах...",
+            triplets.len()
+        );
 
         let device = Device::Cpu;
         let varmap = VarMap::new();

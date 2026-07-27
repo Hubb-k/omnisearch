@@ -92,8 +92,8 @@ pub fn init_with_password(data_dir: &str, password: &str) -> Result<(), String> 
             .try_into()
             .map_err(|_| "Неверный размер соли".to_string())?;
         let derived = derive_key(password, &salt_bytes);
-        let blob = std::fs::read(&key_path)
-            .map_err(|e| format!("Не удалось прочитать key.bin: {}", e))?;
+        let blob =
+            std::fs::read(&key_path).map_err(|e| format!("Не удалось прочитать key.bin: {}", e))?;
         decrypt_master_key(&blob, &derived).ok_or_else(|| "Неверный пароль".to_string())?
     } else {
         std::fs::create_dir_all(data_dir)

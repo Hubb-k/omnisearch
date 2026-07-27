@@ -7,11 +7,11 @@ pub fn should_train(feedback_count: usize) -> bool {
     feedback_count > 0 && feedback_count % threshold == 0
 }
 
-pub fn spawn_adapter_training(
-    triplets: Vec<[Vec<f32>; 3]>,
-    model_dir: String,
-) {
-    eprintln!("[Train] Триггер: {} пар, запуск адаптера...", triplets.len());
+pub fn spawn_adapter_training(triplets: Vec<[Vec<f32>; 3]>, model_dir: String) {
+    eprintln!(
+        "[Train] Триггер: {} пар, запуск адаптера...",
+        triplets.len()
+    );
     crate::adapter::train(triplets, model_dir);
 }
 
